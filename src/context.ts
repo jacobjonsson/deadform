@@ -3,6 +3,8 @@ import {FieldState} from "./types";
 import {ValidatorEntity} from "./validation";
 
 export interface DeadFormContext {
+    formState: "idle" | "pending";
+    formValues: Record<string, string | undefined>;
     getFieldValue: (name: string) => string | undefined;
     getFieldMessage: (name: string) => string | undefined;
     getFieldState: (name: string) => FieldState | undefined;
@@ -12,6 +14,8 @@ export interface DeadFormContext {
 }
 
 export const deadFormContext = createContext<DeadFormContext>({
+    formState: "idle",
+    formValues: {},
     getFieldValue: () => "",
     getFieldMessage: () => undefined,
     getFieldState: () => "idle",
