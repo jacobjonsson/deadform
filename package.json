@@ -16,6 +16,7 @@
     "start": "tsc -w",
     "build": "tsc",
     "test": "jest",
+    "prepublish": "yarn build",
     "size": "size-limit",
     "analyze": "size-limit --why",
     "storybook": "start-storybook -p 6006",
@@ -30,6 +31,9 @@
       "limit": "10 KB"
     }
   ],
+  "release": {
+      "branches": ["main"]
+  },
   "devDependencies": {
     "@size-limit/preset-small-lib": "^5.0.1",
     "@storybook/addon-actions": "^6.3.2",
