@@ -1,6 +1,6 @@
 import React from "react";
 import {fireEvent, render, screen} from "@testing-library/react";
-import {Form, Field} from "../src/index";
+import {Form, Field} from "../src";
 
 test("should handle change value", () => {
     const handleSubmit = jest.fn();
@@ -8,12 +8,12 @@ test("should handle change value", () => {
     render(
         <Form onSubmit={handleSubmit}>
             <Field name="name" initialValue="">
-                {props => (
+                {(props) => (
                     <input
                         placeholder="Enter name"
                         value={props.value}
-                        onChange={evt => props.changeValue(evt.currentTarget.value)}
-                        onBlur={evt => props.commitValue(evt.currentTarget.value)}
+                        onChange={(evt) => props.changeValue(evt.currentTarget.value)}
+                        onBlur={(evt) => props.commitValue(evt.currentTarget.value)}
                     />
                 )}
             </Field>
