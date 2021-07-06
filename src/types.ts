@@ -7,8 +7,9 @@ export type FieldValidationOutcome =
     | {status: "warning"; message: string}
     | {status: "error"; message: string};
 
-export interface InternalField {
-    state: FieldState;
-    message?: string;
-    value: string;
-}
+export type Field = {name: string; value: string} & (
+    | {state: "success"; value: string}
+    | {state: "pending"; value: string}
+    | {state: "warning"; value: string; message: string}
+    | {state: "error"; value: string; message: string}
+);

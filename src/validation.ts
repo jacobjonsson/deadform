@@ -40,7 +40,7 @@ export function newAsyncValidator(
         type: "async",
         fn(value, values) {
             return fn(value, values)
-                .then(res => {
+                .then((res) => {
                     if (res) {
                         return {status: "success"} as const;
                     }
@@ -55,11 +55,11 @@ export function newAsyncValidator(
 }
 
 export function isAllSync(entities: Array<ValidatorEntity>): entities is Array<SyncValidatorEntity> {
-    return entities.every(e => e.type === "sync");
+    return entities.every((e) => e.type === "sync");
 }
 
 export function isAllAsync(entities: Array<ValidatorEntity>): entities is Array<AsyncValidatorEntity> {
-    return entities.every(e => e.type === "async");
+    return entities.every((e) => e.type === "async");
 }
 
 export function executeSyncValidation(
@@ -110,4 +110,16 @@ export async function executeMixedValidation(
     }
 
     return {status: "success"};
+}
+
+export function isSuccessful(outcomes: Array<ValidatorOutcome>): boolean {
+    return outcomes.every((o) => o.status === "success");
+}
+
+export function hasError(outcomes: Array<ValidatorOutcome>): boolean {
+    return outcomes.some((o) => o.status === "error");
+}
+
+export function hasWarning(outcomes: Array<ValidatorOutcome>): boolean {
+    return outcomes.some((o) => o.status === "warning");
 }

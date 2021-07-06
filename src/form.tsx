@@ -1,21 +1,32 @@
-import React, {useReducer, useRef} from "react";
+import React, {useEffect, useReducer, useRef} from "react";
 import {FormHTMLAttributes, ReactNode, useCallback, useMemo} from "react";
 import {deadFormContext} from "./context";
-import {FieldState} from "./types";
+import {Field, FieldState} from "./types";
 import {
     executeAsyncValidation,
     executeMixedValidation,
     executeSyncValidation,
     isAllAsync,
     isAllSync,
+    isSuccessful,
+    SyncValidatorEntity,
     ValidatorEntity,
     ValidatorOutcome,
 } from "./validation";
+import {createEffectReference, EffectReference} from "./effect";
+import {randomId} from "./id";
+import {collectFields} from "./utils";
 
 export interface FormState {
     values: Record<string, string | undefined>;
     states: Record<string, FieldState | undefined>;
     messages: Record<string, string | undefined>;
+    effects: Array<
+        | EffectReference<"onFieldInteraction", Field>
+        | EffectReference<"onFieldValidation", Field>
+        | EffectReference<"onFormValidationError", Record<string, Field>>
+        | EffectReference<"onSubmit", Record<string, string | undefined>>
+    >;
 }
 
 type FormEvent =
@@ -23,8 +34,10 @@ type FormEvent =
     | {type: "unregister"; name: string}
     | {type: "commit_sync"; name: string; value: string; outcome: ValidatorOutcome}
     | {type: "commit_async"; name: string; value: string}
-    | {type: "resolve_async"; name: string; outcome: ValidatorOutcome}
-    | {type: "submit"};
+    | {type: "resolve_async_commit"; name: string; outcome: ValidatorOutcome}
+    | {type: "submit_sync"; outcomes: Array<{name: string; outcome: ValidatorOutcome}>}
+    | {type: "submit_async"}
+    | {type: "resolve_async_submit"; outcomes: Array<{name: string; outcome: ValidatorOutcome}>};
 
 function reducer(state: FormState, event: FormEvent): FormState {
     switch (event.type) {
@@ -74,6 +87,22 @@ function reducer(state: FormState, event: FormEvent): FormState {
                               ...state.messages,
                               [event.name]: undefined,
                           },
+
+                effects: [
+                    ...state.effects,
+                    createEffectReference("onFieldInteraction", {
+                        name: event.name,
+                        value: typeof event.value === "undefined" ? state.values[event.name] : event.value,
+                        state: event.outcome.status,
+                        ...(event.outcome.status !== "success" ? {message: event.outcome.message} : {}),
+                    } as Field),
+                    createEffectReference("onFieldValidation", {
+                        name: event.name,
+                        value: typeof event.value === "undefined" ? state.values[event.name] : event.value,
+                        state: event.outcome.status,
+                        ...(event.outcome.status !== "success" ? {message: event.outcome.message} : {}),
+                    } as Field),
+                ],
             };
         }
 
@@ -92,10 +121,18 @@ function reducer(state: FormState, event: FormEvent): FormState {
                     ...state.messages,
                     [event.name]: undefined,
                 },
+                effects: [
+                    ...state.effects,
+                    createEffectReference("onFieldInteraction", {
+                        name: event.name,
+                        value: typeof event.value === "undefined" ? state.values[event.name] : event.value,
+                        state: "pending",
+                    } as Field),
+                ],
             };
         }
 
-        case "resolve_async": {
+        case "resolve_async_commit": {
             return {
                 ...state,
                 states: {
@@ -112,11 +149,106 @@ function reducer(state: FormState, event: FormEvent): FormState {
                               ...state.messages,
                               [event.name]: undefined,
                           },
+                effects: [
+                    ...state.effects,
+                    createEffectReference("onFieldValidation", {
+                        name: event.name,
+                        value: state.values[event.name],
+                        state: event.outcome.status,
+                        ...(event.outcome.status !== "success" ? {message: event.outcome.message} : {}),
+                    } as Field),
+                ],
             };
         }
 
-        case "submit": {
-            return state;
+        case "submit_sync": {
+            const states = event.outcomes.reduce(
+                (acc, curr) => ({
+                    ...acc,
+                    [curr.name]: curr.outcome.status,
+                }),
+                state.states
+            );
+
+            const messages = event.outcomes.reduce(
+                (acc, curr) =>
+                    curr.outcome.status === "success"
+                        ? {...acc, [curr.name]: undefined}
+                        : {...acc, [curr.name]: curr.outcome.message},
+                state.messages
+            );
+
+            return {
+                ...state,
+                states,
+                messages,
+                effects: [
+                    ...state.effects,
+                    isSuccessful(event.outcomes.map((o) => o.outcome))
+                        ? createEffectReference("onSubmit", state.values)
+                        : createEffectReference(
+                              "onFormValidationError",
+                              collectFields(state.values, state.states, state.messages)
+                          ),
+                ],
+            };
+        }
+
+        case "submit_async": {
+            const states = Object.keys(state.states).reduce(
+                (acc, curr) => ({
+                    ...acc,
+                    [curr]: "pending",
+                }),
+                {}
+            );
+
+            const messages = Object.keys(state.messages).reduce(
+                (acc, curr) => ({
+                    ...acc,
+                    [curr]: undefined,
+                }),
+                {}
+            );
+
+            return {
+                ...state,
+                states,
+                messages,
+            };
+        }
+
+        case "resolve_async_submit": {
+            const states = event.outcomes.reduce(
+                (acc, curr) => ({
+                    ...acc,
+                    [curr.name]: curr.outcome.status,
+                }),
+                state.states
+            );
+
+            const messages = event.outcomes.reduce(
+                (acc, curr) =>
+                    curr.outcome.status === "success"
+                        ? {...acc, [curr.name]: undefined}
+                        : {...acc, [curr.name]: curr.outcome.message},
+                state.messages
+            );
+
+            return {
+                ...state,
+                states,
+                messages,
+                effects: [
+                    ...state.effects,
+                    isSuccessful(event.outcomes.map((o) => o.outcome))
+                        ? createEffectReference("onSubmit", state.values)
+                        : createEffectReference(
+                              "onFormValidationError",
+                              collectFields(state.values, state.states, state.values)
+                          ),
+                ],
+            };
         }
 
         default: {
@@ -127,19 +259,74 @@ function reducer(state: FormState, event: FormEvent): FormState {
 
 export interface FormProps extends Omit<FormHTMLAttributes<HTMLFormElement>, "onSubmit"> {
     children: ReactNode;
+    /**
+     * Called after the form has been submitted and validation passed.
+     */
     onSubmit: (values: Record<string, string | undefined>) => void;
+    /**
+     * Called after the form has been submitted but validation did not pass.
+     */
+    onFormValidationError?: (fields: Record<string, Field>) => void;
+    /**
+     * Called after commit
+     */
+    onFieldInteraction?: (field: Field) => void;
+    /**
+     * Called after a field has been validated
+     */
+    onFieldValidation?: (field: Field) => void;
 }
 
 export function Form(props: FormProps) {
-    const {children, onSubmit, ...rest} = props;
+    const {children, onSubmit, onFieldInteraction, onFieldValidation, onFormValidationError, ...rest} = props;
 
     const validatorEntities = useRef<Record<string, Array<ValidatorEntity> | undefined>>({});
+    const cancelationRefs = useRef<Record<string, string | undefined>>({});
+    const submitCancelationRef = useRef<string | undefined>(undefined);
 
     const [state, dispatch] = useReducer(reducer, {
         values: {},
         states: {},
         messages: {},
+        effects: [],
     });
+
+    useEffect(() => {
+        for (const effect of state.effects) {
+            if (effect.executed) {
+                continue;
+            }
+
+            effect.executed = true;
+
+            switch (effect.reference) {
+                case "onFieldInteraction": {
+                    if (onFieldInteraction) {
+                        onFieldInteraction(effect.payload);
+                    }
+                    break;
+                }
+                case "onFieldValidation": {
+                    if (onFieldValidation) {
+                        onFieldValidation(effect.payload);
+                    }
+                    break;
+                }
+                case "onFormValidationError": {
+                    if (onFormValidationError) {
+                        onFormValidationError(effect.payload);
+                    }
+                    break;
+                }
+                case "onSubmit": {
+                    if (onSubmit) {
+                        onSubmit(effect.payload);
+                    }
+                    break;
+                }
+            }
+        }
+    }, [state.effects, onFieldInteraction, onFieldValidation, onSubmit, onFormValidationError]);
 
     const getFieldValue = useCallback(
         (name: string) => {
@@ -182,16 +369,21 @@ export function Form(props: FormProps) {
             }
 
             if (isAllAsync(validators)) {
+                const cancelationRef = randomId();
+                cancelationRefs.current[name] = cancelationRef;
                 dispatch({type: "commit_async", name, value});
-                executeAsyncValidation(validators, value, state.values).then(outcome => {
-                    dispatch({type: "resolve_async", name, outcome});
+                executeAsyncValidation(validators, value, state.values).then((outcome) => {
+                    if (cancelationRefs.current[name] === cancelationRef) {
+                        dispatch({type: "resolve_async_commit", name, outcome});
+                        delete cancelationRefs.current[name];
+                    }
                 });
                 return;
             }
 
             dispatch({type: "commit_async", name, value});
-            executeMixedValidation(validators, value, state.values).then(outcome => {
-                dispatch({type: "resolve_async", name, outcome});
+            executeMixedValidation(validators, value, state.values).then((outcome) => {
+                dispatch({type: "resolve_async_commit", name, outcome});
             });
         },
         [state.values]
@@ -222,7 +414,53 @@ export function Form(props: FormProps) {
     function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
         event.preventDefault();
         event.stopPropagation();
-        props.onSubmit(state.values);
+
+        // Cancel all of the currently pending async validations
+        for (const key of Object.keys(cancelationRefs.current)) {
+            cancelationRefs.current[key] = randomId();
+        }
+
+        const submitRef = randomId();
+        submitCancelationRef.current = submitRef;
+
+        if (Object.values(validatorEntities.current).every((v) => typeof v === "undefined" || isAllSync(v))) {
+            const outcomes: Array<{name: string; outcome: ValidatorOutcome}> = [];
+            for (const [name, value] of Object.entries(state.values)) {
+                const entities = validatorEntities.current[name] as Array<SyncValidatorEntity>;
+                if (!validatorEntities) {
+                    outcomes.push({name, outcome: {status: "success"}});
+                    continue;
+                }
+
+                const outcome = executeSyncValidation(entities!, value!, state.values);
+                outcomes.push({name, outcome});
+            }
+            dispatch({type: "submit_sync", outcomes});
+
+            return;
+        }
+
+        dispatch({type: "submit_async"});
+
+        const outcomes: Array<Promise<{name: string; outcome: ValidatorOutcome}>> = [];
+        for (const [name, value] of Object.entries(state.values)) {
+            const entities = validatorEntities.current[name];
+            if (!validatorEntities) {
+                outcomes.push(Promise.resolve({name, outcome: {status: "success"}}));
+                continue;
+            }
+
+            const outcome = executeMixedValidation(entities!, value!, state.values).then((outcome) => ({
+                name,
+                outcome,
+            }));
+            outcomes.push(outcome);
+        }
+        Promise.all(outcomes).then((outcomes) => {
+            if (submitCancelationRef.current === submitRef) {
+                dispatch({type: "resolve_async_submit", outcomes});
+            }
+        });
     }
 
     return (
