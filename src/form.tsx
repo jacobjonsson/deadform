@@ -18,6 +18,7 @@ import {randomId} from "./id";
 import {collectFields} from "./utils";
 
 export interface FormState {
+    status: "idle" | "pending";
     values: Record<string, string | undefined>;
     states: Record<string, FieldState | undefined>;
     messages: Record<string, string | undefined>;
@@ -213,6 +214,7 @@ function reducer(state: FormState, event: FormEvent): FormState {
 
             return {
                 ...state,
+                status: "pending",
                 states,
                 messages,
             };
@@ -237,6 +239,7 @@ function reducer(state: FormState, event: FormEvent): FormState {
 
             return {
                 ...state,
+                status: "idle",
                 states,
                 messages,
                 effects: [
@@ -285,6 +288,7 @@ export function Form(props: FormProps) {
     const submitCancelationRef = useRef<string | undefined>(undefined);
 
     const [state, dispatch] = useReducer(reducer, {
+        status: "idle",
         values: {},
         states: {},
         messages: {},
@@ -407,8 +411,19 @@ export function Form(props: FormProps) {
             commitValue,
             registerField,
             unregisterField,
+            formState: state.status,
+            formValues: state.values,
         }),
-        [getFieldValue, getFieldState, getFieldMessage, commitValue, registerField, unregisterField]
+        [
+            getFieldValue,
+            getFieldState,
+            getFieldMessage,
+            commitValue,
+            registerField,
+            unregisterField,
+            state.status,
+            state.values,
+        ]
     );
 
     function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
