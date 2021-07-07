@@ -373,22 +373,14 @@ export function Form(props: FormProps) {
                 return;
             }
 
-            if (isAllAsync(validators)) {
-                const cancelationRef = randomId();
-                cancelationRefs.current[name] = cancelationRef;
-                dispatch({type: "commit_async", name, value});
-                executeAsyncValidation(validators, value, {...state.values, [name]: value}).then((outcome) => {
-                    if (cancelationRefs.current[name] === cancelationRef) {
-                        dispatch({type: "resolve_async_commit", name, outcome});
-                        delete cancelationRefs.current[name];
-                    }
-                });
-                return;
-            }
-
+            const cancelationRef = randomId();
+            cancelationRefs.current[name] = cancelationRef;
             dispatch({type: "commit_async", name, value});
             executeMixedValidation(validators, value, {...state.values, [name]: value}).then((outcome) => {
-                dispatch({type: "resolve_async_commit", name, outcome});
+                if (cancelationRefs.current[name] === cancelationRef) {
+                    dispatch({type: "resolve_async_commit", name, outcome});
+                    delete cancelationRefs.current[name];
+                }
             });
         },
         [state.values]
