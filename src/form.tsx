@@ -368,7 +368,7 @@ export function Form(props: FormProps) {
             }
 
             if (isAllSync(validators)) {
-                const outcome = executeSyncValidation(validators, value, state.values);
+                const outcome = executeSyncValidation(validators, value, {...state.values, [name]: value});
                 dispatch({type: "commit_sync", name, value, outcome});
                 return;
             }
@@ -377,7 +377,7 @@ export function Form(props: FormProps) {
                 const cancelationRef = randomId();
                 cancelationRefs.current[name] = cancelationRef;
                 dispatch({type: "commit_async", name, value});
-                executeAsyncValidation(validators, value, state.values).then((outcome) => {
+                executeAsyncValidation(validators, value, {...state.values, [name]: value}).then((outcome) => {
                     if (cancelationRefs.current[name] === cancelationRef) {
                         dispatch({type: "resolve_async_commit", name, outcome});
                         delete cancelationRefs.current[name];
@@ -387,7 +387,7 @@ export function Form(props: FormProps) {
             }
 
             dispatch({type: "commit_async", name, value});
-            executeMixedValidation(validators, value, state.values).then((outcome) => {
+            executeMixedValidation(validators, value, {...state.values, [name]: value}).then((outcome) => {
                 dispatch({type: "resolve_async_commit", name, outcome});
             });
         },
