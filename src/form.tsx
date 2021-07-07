@@ -1,7 +1,7 @@
 import React, {useEffect, useReducer, useRef} from "react";
 import {FormHTMLAttributes, ReactNode, useCallback, useMemo} from "react";
 import {deadFormContext} from "./context";
-import {Field, FieldState} from "./types";
+import {Field, FieldState, FieldWithMeta} from "./types";
 import {
     executeAsyncValidation,
     executeMixedValidation,
@@ -273,17 +273,18 @@ export interface FormProps extends Omit<FormHTMLAttributes<HTMLFormElement>, "on
     /**
      * Called after commit
      */
-    onFieldInteraction?: (field: Field) => void;
+    onFieldInteraction?: (field: FieldWithMeta) => void;
     /**
      * Called after a field has been validated
      */
-    onFieldValidation?: (field: Field) => void;
+    onFieldValidation?: (field: FieldWithMeta) => void;
 }
 
 export function Form(props: FormProps) {
     const {children, onSubmit, onFieldInteraction, onFieldValidation, onFormValidationError, ...rest} = props;
 
     const validatorEntities = useRef<Record<string, Array<ValidatorEntity> | undefined>>({});
+    const fieldMetas = useRef<Record<string, Record<string, any>>>({});
     const cancelationRefs = useRef<Record<string, string | undefined>>({});
     const submitCancelationRef = useRef<string | undefined>(undefined);
 
@@ -306,13 +307,13 @@ export function Form(props: FormProps) {
             switch (effect.reference) {
                 case "onFieldInteraction": {
                     if (onFieldInteraction) {
-                        onFieldInteraction(effect.payload);
+                        onFieldInteraction({...effect.payload, meta: fieldMetas.current[effect.payload.name]});
                     }
                     break;
                 }
                 case "onFieldValidation": {
                     if (onFieldValidation) {
-                        onFieldValidation(effect.payload);
+                        onFieldValidation({...effect.payload, meta: fieldMetas.current[effect.payload.name]});
                     }
                     break;
                 }
@@ -393,11 +394,15 @@ export function Form(props: FormProps) {
         [state.values]
     );
 
-    const registerField = useCallback((name: string, value: string, validators: Array<ValidatorEntity>) => {
-        dispatch({type: "register", name, value});
+    const registerField = useCallback(
+        (name: string, value: string, validators: Array<ValidatorEntity>, meta: Record<string, string>) => {
+            dispatch({type: "register", name, value});
 
-        validatorEntities.current[name] = validators;
-    }, []);
+            validatorEntities.current[name] = validators;
+            fieldMetas.current[name] = meta;
+        },
+        []
+    );
 
     const unregisterField = useCallback((name: string) => {
         dispatch({type: "unregister", name});

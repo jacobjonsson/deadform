@@ -95,6 +95,7 @@ export function Basic() {
                 <Field
                     initialValue=""
                     name="email"
+                    meta={{trackValue: false}}
                     validators={[
                         newAsyncValidator(
                             (value) => new Promise((res) => setTimeout(() => res(value.length > 5), 5000)),

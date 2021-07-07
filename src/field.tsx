@@ -15,15 +15,16 @@ export interface FieldConfig {
     name: string;
     initialValue?: string;
     validators?: Array<ValidatorEntity>;
+    meta?: Record<string, any>;
 }
 
 export function Field(props: FieldConfig) {
-    const {name, initialValue = "", validators = [], children} = props;
+    const {name, initialValue = "", validators = [], meta = {}, children} = props;
     const ctx = useDeadFormContext();
     const [localValue, setLocalVale] = useState(initialValue);
 
     useEffect(() => {
-        ctx.registerField(name, localValue, validators);
+        ctx.registerField(name, localValue, validators, meta);
         return () => ctx.unregisterField(name);
     }, []);
 
