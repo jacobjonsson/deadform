@@ -13,3 +13,5 @@ export type Field = {name: string; value: string} & (
     | {state: "warning"; value: string; message: string}
     | {state: "error"; value: string; message: string}
 );
+
+export type FieldWithMeta = Field & {meta: Record<string, any>};
