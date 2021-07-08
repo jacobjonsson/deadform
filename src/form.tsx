@@ -464,7 +464,6 @@ export function Form(props: FormProps) {
             return;
         }
 
-        // TODO: Filter out all of the sync validations and run them before dispatching
         const syncFields: Array<[string, Array<SyncValidatorEntity>]> = Object.keys(state.values).reduce(
             (acc, curr) => {
                 const entities = validatorEntities.current[curr];
