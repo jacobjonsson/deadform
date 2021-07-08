@@ -31,11 +31,12 @@ export function Basic() {
                 <Field
                     initialValue=""
                     name="name"
+                    formatter={(_) => "123456"}
                     validators={[
                         newAsyncValidator(
                             (value) => new Promise((res) => setTimeout(() => res(value.length > 5), 5000)),
                             "error",
-                            "This shit works..."
+                            "Oh oh..."
                         ),
                     ]}
                 >
@@ -63,7 +64,7 @@ export function Basic() {
                 <Field
                     initialValue=""
                     name="phone"
-                    validators={[newSyncValidator((value) => value.length > 5, "error", "This shit works...")]}
+                    validators={[newSyncValidator((value) => value.length > 5, "error", "Oh oh...")]}
                 >
                     {(props) => (
                         <div style={{marginBottom: "16px"}}>
@@ -90,7 +91,7 @@ export function Basic() {
                     initialValue=""
                     name="email"
                     meta={{trackValue: false}}
-                    validators={[newSyncValidator((value) => value.length > 5, "error", "This shit works...")]}
+                    validators={[newSyncValidator((value) => value.length > 5, "error", "Oh oh...")]}
                 >
                     {(props) => (
                         <div style={{marginBottom: "16px"}}>

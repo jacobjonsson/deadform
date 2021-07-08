@@ -1,6 +1,7 @@
 import {ReactElement, useEffect, useState} from "react";
 import {useDeadFormContext} from "./context";
 import {ValidatorEntity} from "./validation";
+import {identity} from "./identity";
 
 export type FieldProps = {changeValue: (value: string) => void; commitValue: (value: string) => void; value: string} & (
     | {state: "idle"}
@@ -16,15 +17,16 @@ export interface FieldConfig {
     initialValue?: string;
     validators?: Array<ValidatorEntity>;
     meta?: Record<string, any>;
+    formatter?: (value: string) => string;
 }
 
 export function Field(props: FieldConfig) {
-    const {name, initialValue = "", validators = [], meta = {}, children} = props;
+    const {name, initialValue = "", validators = [], meta = {}, formatter = identity, children} = props;
     const ctx = useDeadFormContext();
     const [localValue, setLocalVale] = useState(initialValue);
 
     useEffect(() => {
-        ctx.registerField(name, localValue, validators, meta);
+        ctx.registerField({name, formatter, validators, meta, value: localValue});
         return () => ctx.unregisterField(name);
     }, []);
 
