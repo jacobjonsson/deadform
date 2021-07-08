@@ -35,7 +35,7 @@ type FormEvent =
     | {type: "commit_async"; name: string; value: string}
     | {type: "resolve_async_commit"; name: string; outcome: ValidatorOutcome}
     | {type: "submit_sync"; outcomes: Array<{name: string; outcome: ValidatorOutcome}>}
-    | {type: "submit_async"}
+    | {type: "submit_async"; partialOutcomes: Record<string, ValidatorOutcome>}
     | {type: "resolve_async_submit"; outcomes: Array<{name: string; outcome: ValidatorOutcome}>};
 
 function reducer(state: FormState, event: FormEvent): FormState {
@@ -194,21 +194,35 @@ function reducer(state: FormState, event: FormEvent): FormState {
         }
 
         case "submit_async": {
-            const states = Object.keys(state.states).reduce(
-                (acc, curr) => ({
+            const states = Object.keys(state.states).reduce((acc, curr) => {
+                const partialState = event.partialOutcomes[curr];
+                if (typeof partialState !== "undefined") {
+                    return {
+                        ...acc,
+                        [curr]: partialState.status,
+                    };
+                }
+
+                return {
                     ...acc,
                     [curr]: "pending",
-                }),
-                {}
-            );
+                };
+            }, {});
 
-            const messages = Object.keys(state.messages).reduce(
-                (acc, curr) => ({
+            const messages = Object.keys(state.messages).reduce((acc, curr) => {
+                const partialState = event.partialOutcomes[curr];
+                if (typeof partialState !== "undefined" && partialState.status !== "success") {
+                    return {
+                        ...acc,
+                        [curr]: partialState.message,
+                    };
+                }
+
+                return {
                     ...acc,
                     [curr]: undefined,
-                }),
-                {}
-            );
+                };
+            }, {});
 
             return {
                 ...state,
@@ -450,13 +464,36 @@ export function Form(props: FormProps) {
             return;
         }
 
-        dispatch({type: "submit_async"});
+        // TODO: Filter out all of the sync validations and run them before dispatching
+        const syncFields: Array<[string, Array<SyncValidatorEntity>]> = Object.keys(state.values).reduce(
+            (acc, curr) => {
+                const entities = validatorEntities.current[curr];
+                if (typeof entities === "undefined") {
+                    return [...acc, [curr, []]];
+                }
+
+                if (isAllSync(entities)) {
+                    return [...acc, [curr, entities]];
+                }
+
+                return acc;
+            },
+            [] as Array<[string, Array<SyncValidatorEntity>]>
+        );
+
+        const partialOutcomes: Record<string, ValidatorOutcome> = {};
+        for (const [name, entities] of syncFields) {
+            const value = state.values[name]!;
+            const outcome = executeSyncValidation(entities, value, state.values);
+            partialOutcomes[name] = outcome;
+        }
+
+        dispatch({type: "submit_async", partialOutcomes});
 
         const outcomes: Array<Promise<{name: string; outcome: ValidatorOutcome}>> = [];
         for (const [name, value] of Object.entries(state.values)) {
             const entities = validatorEntities.current[name];
-            if (!validatorEntities) {
-                outcomes.push(Promise.resolve({name, outcome: {status: "success"}}));
+            if (typeof partialOutcomes[name] !== "undefined") {
                 continue;
             }
 
