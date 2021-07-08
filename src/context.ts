@@ -1,6 +1,14 @@
 import {createContext, useContext} from "react";
-import {FieldState} from "./types";
+import {FieldFormatter, FieldState} from "./types";
 import {ValidatorEntity} from "./validation";
+
+export interface RegisterFieldProps {
+    name: string;
+    value: string;
+    validators: Array<ValidatorEntity>;
+    formatter: FieldFormatter;
+    meta: Record<string, any>;
+}
 
 export interface DeadFormContext {
     formState: "idle" | "pending";
@@ -9,7 +17,7 @@ export interface DeadFormContext {
     getFieldMessage: (name: string) => string | undefined;
     getFieldState: (name: string) => FieldState | undefined;
     commitValue: (name: string, value?: string) => void;
-    registerField: (name: string, value: string, validators: Array<ValidatorEntity>, meta: Record<string, any>) => void;
+    registerField: (props: RegisterFieldProps) => void;
     unregisterField: (name: string) => void;
 }
 

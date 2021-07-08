@@ -2,6 +2,8 @@ export type FieldState = "idle" | "pending" | "success" | "warning" | "error";
 
 export type FieldValue = string;
 
+export type FieldFormatter = (value: string) => string;
+
 export type FieldValidationOutcome =
     | {status: "success"}
     | {status: "warning"; message: string}

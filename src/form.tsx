@@ -1,12 +1,11 @@
 import React, {useEffect, useReducer, useRef} from "react";
 import {FormHTMLAttributes, ReactNode, useCallback, useMemo} from "react";
-import {deadFormContext} from "./context";
-import {Field, FieldState, FieldWithMeta} from "./types";
+import {deadFormContext, RegisterFieldProps} from "./context";
+import {Field, FieldFormatter, FieldState, FieldWithMeta} from "./types";
 import {
     executeMixedValidation,
     executeSyncValidation,
     isAllSync,
-    isSuccessful,
     SyncValidatorEntity,
     ValidatorEntity,
     ValidatorOutcome,
@@ -86,7 +85,6 @@ function reducer(state: FormState, event: FormEvent): FormState {
                               ...state.messages,
                               [event.name]: undefined,
                           },
-
                 effects: [
                     ...state.effects,
                     createEffectReference("onFieldInteraction", {
@@ -183,7 +181,7 @@ function reducer(state: FormState, event: FormEvent): FormState {
                 messages,
                 effects: [
                     ...state.effects,
-                    isSuccessful(event.outcomes.map((o) => o.outcome))
+                    Object.values(states).every((state) => state === "success")
                         ? createEffectReference("onSubmit", state.values)
                         : createEffectReference(
                               "onFormValidationError",
@@ -256,7 +254,7 @@ function reducer(state: FormState, event: FormEvent): FormState {
                 messages,
                 effects: [
                     ...state.effects,
-                    isSuccessful(event.outcomes.map((o) => o.outcome))
+                    Object.values(states).every((state) => state === "success")
                         ? createEffectReference("onSubmit", state.values)
                         : createEffectReference(
                               "onFormValidationError",
@@ -297,6 +295,7 @@ export function Form(props: FormProps) {
 
     const validatorEntities = useRef<Record<string, Array<ValidatorEntity> | undefined>>({});
     const fieldMetas = useRef<Record<string, Record<string, any>>>({});
+    const fieldFormatters = useRef<Record<string, FieldFormatter>>({});
     const cancelationRefs = useRef<Record<string, string | undefined>>({});
     const submitCancelationRef = useRef<string | undefined>(undefined);
 
@@ -368,7 +367,9 @@ export function Form(props: FormProps) {
 
     const commitValue = useCallback(
         (name: string, newValue?: string) => {
-            const value = typeof newValue === "undefined" ? state.values[name] : newValue;
+            const value = typeof newValue === "undefined" ? state.values[name]! : newValue;
+            const formatter = fieldFormatters.current[name];
+            const formattedValue = formatter(value);
             const validators = validatorEntities.current[name];
             if (typeof validators === "undefined" || typeof value === "undefined") {
                 throw new Error(`${name} hasn't been initialized. This is an internal error in deadform`);
@@ -380,7 +381,7 @@ export function Form(props: FormProps) {
             }
 
             if (isAllSync(validators)) {
-                const outcome = executeSyncValidation(validators, value, {...state.values, [name]: value});
+                const outcome = executeSyncValidation(validators, formattedValue, {...state.values, [name]: value});
                 dispatch({type: "commit_sync", name, value, outcome});
                 return;
             }
@@ -388,7 +389,7 @@ export function Form(props: FormProps) {
             const cancelationRef = randomId();
             cancelationRefs.current[name] = cancelationRef;
             dispatch({type: "commit_async", name, value});
-            executeMixedValidation(validators, value, {...state.values, [name]: value}).then((outcome) => {
+            executeMixedValidation(validators, formattedValue, {...state.values, [name]: value}).then((outcome) => {
                 if (cancelationRefs.current[name] === cancelationRef) {
                     dispatch({type: "resolve_async_commit", name, outcome});
                     delete cancelationRefs.current[name];
@@ -398,15 +399,13 @@ export function Form(props: FormProps) {
         [state.values]
     );
 
-    const registerField = useCallback(
-        (name: string, value: string, validators: Array<ValidatorEntity>, meta: Record<string, string>) => {
-            dispatch({type: "register", name, value});
+    const registerField = useCallback((props: RegisterFieldProps) => {
+        dispatch({type: "register", name: props.name, value: props.value});
 
-            validatorEntities.current[name] = validators;
-            fieldMetas.current[name] = meta;
-        },
-        []
-    );
+        validatorEntities.current[props.name] = props.validators;
+        fieldMetas.current[props.name] = props.meta;
+        fieldFormatters.current[props.name] = props.formatter;
+    }, []);
 
     const unregisterField = useCallback((name: string) => {
         dispatch({type: "unregister", name});
@@ -456,7 +455,10 @@ export function Form(props: FormProps) {
                     continue;
                 }
 
-                const outcome = executeSyncValidation(entities!, value!, state.values);
+                const formatter = fieldFormatters.current[name];
+                const formattedValue = formatter(value!);
+
+                const outcome = executeSyncValidation(entities!, formattedValue, state.values);
                 outcomes.push({name, outcome});
             }
             dispatch({type: "submit_sync", outcomes});
@@ -483,7 +485,9 @@ export function Form(props: FormProps) {
         const partialOutcomes: Record<string, ValidatorOutcome> = {};
         for (const [name, entities] of syncFields) {
             const value = state.values[name]!;
-            const outcome = executeSyncValidation(entities, value, state.values);
+            const formatter = fieldFormatters.current[name];
+            const formattedValue = formatter(value!);
+            const outcome = executeSyncValidation(entities, formattedValue, state.values);
             partialOutcomes[name] = outcome;
         }
 
@@ -496,7 +500,10 @@ export function Form(props: FormProps) {
                 continue;
             }
 
-            const outcome = executeMixedValidation(entities!, value!, state.values).then((outcome) => ({
+            const formatter = fieldFormatters.current[name];
+            const formattedValue = formatter(value!);
+
+            const outcome = executeMixedValidation(entities!, formattedValue!, state.values).then((outcome) => ({
                 name,
                 outcome,
             }));
