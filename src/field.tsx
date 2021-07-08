@@ -31,7 +31,7 @@ export function Field(props: FieldConfig) {
     const message = ctx.getFieldMessage(name);
     const state = ctx.getFieldState(name);
     const changeValue = (value: string) => setLocalVale(value);
-    const commitValue = (value: string) => ctx.commitValue(name, value);
+    const commitValue = (value: string) => ctx.commitValue(name, typeof value === "undefined" ? localValue : value);
 
     return children({
         changeValue,
