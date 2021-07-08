@@ -1,7 +1,7 @@
 import {Meta} from "@storybook/react";
 import {useEffect, useRef} from "react";
 import {Form, Field, SubmitButton, FormValues} from "../src/index";
-import {newAsyncValidator} from "../src/validation";
+import {newAsyncValidator, newSyncValidator} from "../src/validation";
 
 export default {title: "Basic"} as Meta;
 
@@ -63,13 +63,7 @@ export function Basic() {
                 <Field
                     initialValue=""
                     name="phone"
-                    validators={[
-                        newAsyncValidator(
-                            (value) => new Promise((res) => setTimeout(() => res(value.length > 5), 5000)),
-                            "error",
-                            "This shit works..."
-                        ),
-                    ]}
+                    validators={[newSyncValidator((value) => value.length > 5, "error", "This shit works...")]}
                 >
                     {(props) => (
                         <div style={{marginBottom: "16px"}}>
@@ -96,13 +90,7 @@ export function Basic() {
                     initialValue=""
                     name="email"
                     meta={{trackValue: false}}
-                    validators={[
-                        newAsyncValidator(
-                            (value) => new Promise((res) => setTimeout(() => res(value.length > 5), 5000)),
-                            "error",
-                            "This shit works..."
-                        ),
-                    ]}
+                    validators={[newSyncValidator((value) => value.length > 5, "error", "This shit works...")]}
                 >
                     {(props) => (
                         <div style={{marginBottom: "16px"}}>
