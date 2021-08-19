@@ -26,6 +26,12 @@ export function Field(props: FieldConfig) {
     const [localValue, setLocalVale] = useState(initialValue);
 
     useEffect(() => {
+        if (typeof ctx.formValues[name] === "string") {
+            setLocalVale(ctx.formValues[name] as string);
+        }
+    }, [ctx.formValues[name]]);
+
+    useEffect(() => {
         ctx.registerField({name, formatter, validators, meta, value: localValue});
         return () => ctx.unregisterField(name);
     }, []);

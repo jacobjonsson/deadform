@@ -1,5 +1,6 @@
 import React, {Fragment} from "react";
 import {fireEvent, render, screen, act} from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import {Form, Field, newSyncValidator, newAsyncValidator} from "../src";
 
 const noop = () => undefined;
@@ -164,4 +165,28 @@ test("should handle mixed async validation", async () => {
     act(() => (jest.advanceTimersByTime(5000), undefined));
     expect((await screen.findByTestId("state")).innerHTML).toEqual("error");
     expect((await screen.getByTestId("message")).innerHTML).toEqual("error 2");
+});
+
+test("only calling commit value should update the local value", () => {
+    render(
+        <Form onSubmit={() => undefined}>
+            <Field name="civilState" validators={[]}>
+                {(props) => (
+                    <select
+                        placeholder="Pick a car"
+                        value={props.value}
+                        onChange={(evt) => props.commitValue(evt.target.value)}
+                    >
+                        <option value="volvo">Volvo</option>
+                        <option value="porsche">Porsche</option>
+                        <option value="audi">Audi</option>
+                        <option value="volkswagen">Volkswagen</option>
+                    </select>
+                )}
+            </Field>
+        </Form>
+    );
+
+    userEvent.selectOptions(screen.getByPlaceholderText("Pick a car"), "audi");
+    expect((screen.getByPlaceholderText("Pick a car") as HTMLSelectElement).value).toEqual("audi");
 });
