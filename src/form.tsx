@@ -296,8 +296,8 @@ export function Form(props: FormProps) {
     const validatorEntities = useRef<Record<string, Array<ValidatorEntity> | undefined>>({});
     const fieldMetas = useRef<Record<string, Record<string, any>>>({});
     const fieldFormatters = useRef<Record<string, FieldFormatter>>({});
-    const cancelationRefs = useRef<Record<string, string | undefined>>({});
-    const submitCancelationRef = useRef<string | undefined>(undefined);
+    const cancellationRefs = useRef<Record<string, string | undefined>>({});
+    const submitCancellationRef = useRef<string | undefined>(undefined);
 
     const [state, dispatch] = useReducer(reducer, {
         status: "idle",
@@ -375,6 +375,10 @@ export function Form(props: FormProps) {
                 throw new Error(`${name} hasn't been initialized. This is an internal error in deadform`);
             }
 
+            if (value === "") {
+                return;
+            }
+
             if (validators.length === 0) {
                 dispatch({type: "commit_sync", name, value, outcome: {status: "success"}});
                 return;
@@ -386,17 +390,17 @@ export function Form(props: FormProps) {
                 return;
             }
 
-            const cancelationRef = randomId();
-            cancelationRefs.current[name] = cancelationRef;
+            const cancellationRef = randomId();
+            cancellationRefs.current[name] = cancellationRef;
             dispatch({type: "commit_async", name, value});
             executeMixedValidation(validators, formattedValue, {...state.values, [name]: value}).then((outcome) => {
-                if (cancelationRefs.current[name] === cancelationRef) {
+                if (cancellationRefs.current[name] === cancellationRef) {
                     dispatch({type: "resolve_async_commit", name, outcome});
-                    delete cancelationRefs.current[name];
+                    delete cancellationRefs.current[name];
                 }
             });
         },
-        [state.values]
+        [state.values, state.states, state.messages]
     );
 
     const registerField = useCallback((props: RegisterFieldProps) => {
@@ -439,12 +443,12 @@ export function Form(props: FormProps) {
         event.stopPropagation();
 
         // Cancel all of the currently pending async validations
-        for (const key of Object.keys(cancelationRefs.current)) {
-            cancelationRefs.current[key] = randomId();
+        for (const key of Object.keys(cancellationRefs.current)) {
+            cancellationRefs.current[key] = randomId();
         }
 
         const submitRef = randomId();
-        submitCancelationRef.current = submitRef;
+        submitCancellationRef.current = submitRef;
 
         if (Object.values(validatorEntities.current).every((v) => typeof v === "undefined" || isAllSync(v))) {
             const outcomes: Array<{name: string; outcome: ValidatorOutcome}> = [];
@@ -510,7 +514,7 @@ export function Form(props: FormProps) {
             outcomes.push(outcome);
         }
         Promise.all(outcomes).then((outcomes) => {
-            if (submitCancelationRef.current === submitRef) {
+            if (submitCancellationRef.current === submitRef) {
                 dispatch({type: "resolve_async_submit", outcomes});
             }
         });

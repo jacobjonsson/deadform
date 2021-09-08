@@ -55,7 +55,7 @@ test("should handle validation", () => {
         </Form>
     );
 
-    fireEvent.blur(screen.getByPlaceholderText("Enter name"), {target: {value: ""}});
+    fireEvent.blur(screen.getByPlaceholderText("Enter name"), {target: {value: "1"}});
     expect(screen.getByTestId("state").innerHTML).toEqual("error");
     expect(screen.getByTestId("message").innerHTML).toEqual("error");
 
@@ -86,10 +86,10 @@ test("should handle formatting of value", () => {
         </Form>
     );
 
-    fireEvent.blur(screen.getByPlaceholderText("Enter name"), {target: {value: ""}});
+    fireEvent.blur(screen.getByPlaceholderText("Enter name"), {target: {value: "1"}});
     expect(screen.getByTestId("state").innerHTML).toEqual("success");
-    expect(formatter).toHaveBeenCalledWith("");
-    expect(validator).toHaveBeenCalledWith("formatted", {name: ""});
+    expect(formatter).toHaveBeenCalledWith("1");
+    expect(validator).toHaveBeenCalledWith("formatted", {name: "1"});
 });
 
 test("should handle async validation", async () => {
@@ -117,7 +117,7 @@ test("should handle async validation", async () => {
         </Form>
     );
 
-    fireEvent.blur(screen.getByPlaceholderText("Enter name"), {target: {value: ""}});
+    fireEvent.blur(screen.getByPlaceholderText("Enter name"), {target: {value: "1"}});
     expect(screen.getByTestId("state").innerHTML).toEqual("pending");
     act(() => (jest.advanceTimersByTime(5000), undefined));
     expect((await screen.findByTestId("state")).innerHTML).toEqual("error");
@@ -155,7 +155,7 @@ test("should handle mixed async validation", async () => {
         </Form>
     );
 
-    fireEvent.blur(screen.getByPlaceholderText("Enter name"), {target: {value: ""}});
+    fireEvent.blur(screen.getByPlaceholderText("Enter name"), {target: {value: "1"}});
     expect(screen.getByTestId("state").innerHTML).toEqual("pending");
     expect((await screen.findByTestId("state")).innerHTML).toEqual("error");
     expect((await screen.getByTestId("message")).innerHTML).toEqual("error 1");
@@ -189,4 +189,28 @@ test("only calling commit value should update the local value", () => {
 
     userEvent.selectOptions(screen.getByPlaceholderText("Pick a car"), "audi");
     expect((screen.getByPlaceholderText("Pick a car") as HTMLSelectElement).value).toEqual("audi");
+});
+
+test("should not validate empty values", () => {
+    const validator = jest.fn((value: string) => value.length > 5);
+    render(
+        <Form onSubmit={noop}>
+            <Field name="name" validators={[newSyncValidator(validator, "error", "error")]}>
+                {(props) => (
+                    <Fragment>
+                        <input
+                            placeholder="Enter name"
+                            value={props.value}
+                            onChange={(evt) => props.changeValue(evt.currentTarget.value)}
+                            onBlur={(evt) => props.commitValue(evt.currentTarget.value)}
+                        />
+                        <span data-testid="state">{props.state}</span>
+                    </Fragment>
+                )}
+            </Field>
+        </Form>
+    );
+
+    fireEvent.blur(screen.getByPlaceholderText("Enter name"), {target: {value: ""}});
+    expect(screen.getByTestId("state").innerHTML).toEqual("idle");
 });
