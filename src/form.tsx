@@ -30,6 +30,7 @@ export interface FormState {
 type FormEvent =
     | {type: "register"; name: string; value: string}
     | {type: "unregister"; name: string}
+    | {type: "commit_empty"; name: string}
     | {type: "commit_sync"; name: string; value: string; outcome: ValidatorOutcome}
     | {type: "commit_async"; name: string; value: string}
     | {type: "resolve_async_commit"; name: string; outcome: ValidatorOutcome}
@@ -62,6 +63,24 @@ function reducer(state: FormState, event: FormEvent): FormState {
             delete state.states[event.name];
             delete state.messages[event.name];
             return state;
+        }
+
+        case "commit_empty": {
+            return {
+                ...state,
+                values: {
+                    ...state.values,
+                    [event.name]: "",
+                },
+                messages: {
+                    ...state.messages,
+                    [event.name]: undefined,
+                },
+                states: {
+                    ...state.states,
+                    [event.name]: "idle",
+                },
+            };
         }
 
         case "commit_sync": {
@@ -376,6 +395,7 @@ export function Form(props: FormProps) {
             }
 
             if (value === "") {
+                dispatch({type: "commit_empty", name});
                 return;
             }
 
